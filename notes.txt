@@ -1,0 +1,1 @@
+echo "food barf" | gpg2 -ac --batch --passphrase somepass
