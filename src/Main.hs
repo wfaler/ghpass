@@ -35,10 +35,16 @@ main = do
   putStrLn $ "hello "
 
 
+-- TODO: THIS DOESN'T WORK YET!
+clip :: T.Text -> IO T.Text
+clip text = do
+  shelly $ silently $ do
+    cmd "echo" [ T.concat ["echo -n ", text, " | xclip -selection clipboard"]]
+
 encryptAES256 :: Contents -> Filename -> Passphrase -> IO T.Text
 encryptAES256 contents filename passphrase = do
   shelly $ silently $ do
-    (-|-) (run "echo" [contents]) (run "gpg2" ["-ac", "-o", filename, "--cipher-algo", "AES256", "--batch", "--yes", "--passphrase", passphrase])
+    (-|-) (run "echo" ["-n", contents]) (run "gpg2" ["-ac", "-o", filename, "--cipher-algo", "AES256", "--batch", "--yes", "--passphrase", passphrase])
 
 decryptAES256 :: Filename -> Passphrase -> IO T.Text
 decryptAES256 filename passphrase = do
