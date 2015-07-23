@@ -58,7 +58,7 @@ setPassphrase = do
   putStrLn "Repeat Passphrase: "
   pass2 <- withEcho False getLine
   if (pass == pass2)
-    then return $ (Just . T.pack) pass
+    then (return . Just . T.pack) pass
     else return Nothing
 
 withEcho :: Bool -> IO a -> IO a
