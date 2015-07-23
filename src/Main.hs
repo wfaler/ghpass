@@ -1,15 +1,35 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings,DeriveGeneric #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 import Shelly
 import Data.Text as T
 import System.IO
 import Control.Exception
+import GHC.Generics
+import Data.Aeson
 default (T.Text)
+
+
+data Index = Index {entries :: [IndexEntry]} deriving(Show,Eq,Generic)
+data IndexEntry = IndexEntry { label :: T.Text, file :: T.Text} deriving(Show,Eq,Generic)
+data Entry = Entry { keyValues :: [KeyValue] } deriving(Show,Eq,Generic)
+data KeyValue = KeyValue {key :: T.Text, value :: T.Text} deriving(Show,Eq,Generic)
+
+instance FromJSON KeyValue
+instance ToJSON KeyValue
+
+instance FromJSON Entry
+instance ToJSON Entry
+
+instance FromJSON IndexEntry
+instance ToJSON IndexEntry
+
+instance FromJSON Index
+instance ToJSON Index
 
 main :: IO ()
 main = do
   putStrLn $ "hello "
-  
+
 
 encryptAES256 :: T.Text -> T.Text -> T.Text -> IO T.Text
 encryptAES256 contents filename passphrase = do
@@ -43,4 +63,4 @@ withEcho e action = do
   bracket_ (hSetEcho stdin e) (hSetEcho stdin old) action
 
 
---gpg2 --decrypt --cipher-algo AES256   --batch --passphrase test bar.gpg
+
