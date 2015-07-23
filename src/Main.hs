@@ -46,19 +46,19 @@ decryptAES256 filename passphrase = do
     (run "gpg2" ["--decrypt", "--cipher-algo", "AES256", "--batch", "--yes", "--passphrase", passphrase, filename])
 
 
-promptPass :: IO String
+promptPass :: IO Passphrase
 promptPass = do
   putStrLn "Passphrase: "
-  withEcho False getLine
+  withEcho False getLine >>= (return . T.pack)
 
-setPassphrase :: IO (Maybe String)
+setPassphrase :: IO (Maybe Passphrase)
 setPassphrase = do
   putStrLn "Passphrase: "
   pass <- withEcho False getLine
   putStrLn "Repeat Passphrase: "
   pass2 <- withEcho False getLine
   if (pass == pass2)
-    then return $ Just pass
+    then return $ (Just . T.pack) pass
     else return Nothing
 
 withEcho :: Bool -> IO a -> IO a
