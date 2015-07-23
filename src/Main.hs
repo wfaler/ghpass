@@ -9,6 +9,10 @@ import Data.Aeson
 default (T.Text)
 
 
+type Passphrase = T.Text
+type Contents = T.Text
+type Filename = T.Text
+
 data Index = Index {entries :: [IndexEntry]} deriving(Show,Eq,Generic)
 data IndexEntry = IndexEntry { label :: T.Text, file :: T.Text} deriving(Show,Eq,Generic)
 data Entry = Entry { keyValues :: [KeyValue] } deriving(Show,Eq,Generic)
@@ -31,12 +35,12 @@ main = do
   putStrLn $ "hello "
 
 
-encryptAES256 :: T.Text -> T.Text -> T.Text -> IO T.Text
+encryptAES256 :: Contents -> Filename -> Passphrase -> IO T.Text
 encryptAES256 contents filename passphrase = do
   shelly $ silently $ do
     (-|-) (run "echo" [contents]) (run "gpg2" ["-ac", "-o", filename, "--cipher-algo", "AES256", "--batch", "--yes", "--passphrase", passphrase])
 
-decryptAES256 :: T.Text -> T.Text -> IO T.Text
+decryptAES256 :: Filename -> Passphrase -> IO T.Text
 decryptAES256 filename passphrase = do
   shelly $ silently $ do
     (run "gpg2" ["--decrypt", "--cipher-algo", "AES256", "--batch", "--yes", "--passphrase", passphrase, filename])
@@ -61,6 +65,3 @@ withEcho :: Bool -> IO a -> IO a
 withEcho e action = do
   old <- hGetEcho stdin
   bracket_ (hSetEcho stdin e) (hSetEcho stdin old) action
-
-
-
