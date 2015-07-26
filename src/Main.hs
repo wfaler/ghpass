@@ -15,6 +15,7 @@ import System.Exit
 import System.Environment
 import System.Random
 import qualified Data.List as L
+import Data.Maybe
 import Data.UUID.V4
 import qualified Data.UUID as UUID
 
@@ -25,8 +26,15 @@ type Filename = T.Text
 
 data Index = Index {entries :: [IndexEntry]} deriving(Show,Eq,Generic)
 data IndexEntry = IndexEntry { label :: T.Text, file :: String} deriving(Show,Eq,Generic)
-data Entry = Entry { keyValues :: [KeyValue] } deriving(Show,Eq,Generic)
-data KeyValue = KeyValue {key :: T.Text, value :: T.Text} deriving(Show,Eq,Generic)
+data Entry = Entry { keyValues :: [KeyValue] } deriving(Eq,Generic)
+data KeyValue = KeyValue {key :: T.Text, value :: T.Text} deriving(Eq,Generic)
+
+instance Show KeyValue where
+  show kv = ((T.unpack . key) kv) ++ ": " ++ ((T.unpack . value) kv)
+
+-- TODO FIX THIS
+instance Show Entry where
+  show e = show $ fmap show (keyValues e)
 
 instance FromJSON KeyValue
 instance ToJSON KeyValue
@@ -62,7 +70,18 @@ main = do
       idx <- index pass
       passwd <- (genPass genPwdNoSpecials pwdLength)
       newEntry entry username passwd pass idx
-    processArgs ["clip", entry] = error "todo"
+    processArgs ["clip", entry] = do
+      pass <- promptPass
+      maybeEntry <- index pass >>= (\idx -> return $ L.find (\x -> (label x) == (T.pack entry)) (entries idx))
+      clipEntry maybeEntry pass
+      where
+        clipEntry Nothing pass = do
+          putStrLn $ "no entry matching '" ++ entry ++ "' found!"
+          exitFailure
+        clipEntry (Just fileEntry) pass = do
+          entry <- getEntry pass (file fileEntry)
+          _ <- clip $ fromMaybe "" (fmap (\kv -> (value kv)) (L.find (\kv -> (key kv) == "password") (keyValues entry)))
+          putStrLn "Password has been copied into your clipboard"
     processArgs ["show", entry] = error "todo"
     processArgs ["search", substr] = error "todo"
     processArgs ["import1password", fileName] = error "todo"
@@ -226,6 +245,11 @@ index pass = do
   dr <- passDir
   fromFile (T.pack (dr ++ "index.gpg")) pass :: IO Index
 
+getEntry :: Passphrase -> String -> IO Entry
+getEntry pass fileName = do
+  dr <- dataDir
+  fromFile (T.pack (dr ++ fileName ++ ".gpg")) pass :: IO Entry
+
 saveIndex :: Index -> Passphrase -> IO T.Text
 saveIndex idx pass = do
   dr <- passDir
@@ -241,3 +265,4 @@ saveFile overwrite obj file pass = do
       exitFailure
     else
     encrypt (toTxt $ obj) (T.pack file) pass
+
