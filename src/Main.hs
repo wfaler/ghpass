@@ -24,7 +24,7 @@ type Filename = T.Text
 
 
 data Index = Index {entries :: [IndexEntry]} deriving(Show,Eq,Generic)
-data IndexEntry = IndexEntry { label :: T.Text, file :: T.Text} deriving(Show,Eq,Generic)
+data IndexEntry = IndexEntry { label :: T.Text, file :: String} deriving(Show,Eq,Generic)
 data Entry = Entry { keyValues :: [KeyValue] } deriving(Show,Eq,Generic)
 data KeyValue = KeyValue {key :: T.Text, value :: T.Text} deriving(Show,Eq,Generic)
 
@@ -73,6 +73,7 @@ main = do
       putStrLn "your options did not match any valid options"
       exitFailure
 
+newEntry :: String -> String -> T.Text -> Passphrase -> Index -> IO ()
 newEntry entry username newPwd pass idx = do
   entryExists <- return $ any (\x -> (label x) == (T.pack entry)) (entries idx)
   if (entryExists)
@@ -84,8 +85,10 @@ newEntry entry username newPwd pass idx = do
     do
       filename <- nextRandom
       dtDir <- dataDir
-      entry <- return $ Entry [(KeyValue "username" (T.pack username)), (KeyValue "password" newPwd)]
-      putStrLn "do stuff"
+      entr <- return $ Entry [(KeyValue "username" (T.pack username)), (KeyValue "password" newPwd)]
+      _ <- saveFile False entr (dtDir ++ (UUID.toString filename) ++ ".gpg") pass
+      newIdx <- saveIndex (Index ((IndexEntry (T.pack entry) (UUID.toString filename)) : (entries idx))) pass
+      putStrLn "New entry created"
 
 genPass :: Read a => (a -> [t] -> IO T.Text) -> String -> IO T.Text
 genPass genFn pwdLength = do
@@ -188,7 +191,7 @@ initStore = do
         DIR.createDirectory dir
         dataDr <- dataDir
         DIR.createDirectory dataDr
-        _ <- saveFile (Index []) (dir ++ "index.gpg") pass
+        _ <- saveFile True (Index []) (dir ++ "index.gpg") pass
         putStrLn "Initialised new ghpass store"
 
 
@@ -222,9 +225,19 @@ index :: Passphrase -> IO Index
 index pass = do
   dr <- passDir
   fromFile (T.pack (dr ++ "index.gpg")) pass :: IO Index
-  
-uuidToText :: UUID.UUID -> T.Text
-uuidToText = T.pack . UUID.toString
 
-saveFile :: ToJSON a => a -> String -> Passphrase -> IO T.Text
-saveFile obj file pass = encrypt (toTxt $ obj) (T.pack file) pass
+saveIndex :: Index -> Passphrase -> IO T.Text
+saveIndex idx pass = do
+  dr <- passDir
+  saveFile True idx (dr ++ "index.gpg") pass
+  
+saveFile :: ToJSON a => Bool -> a -> String -> Passphrase -> IO T.Text
+saveFile overwrite obj file pass = do
+  fileExists <- DIR.doesFileExist file
+  if (fileExists && (overwrite == False))
+    then
+    do
+      putStrLn "Duplicate file, exiting!"
+      exitFailure
+    else
+    encrypt (toTxt $ obj) (T.pack file) pass
