@@ -73,10 +73,7 @@ main = do
           _ <- clip $ fromMaybe "" (fmap (\kv -> (value kv)) (L.find (\kv -> (key kv) == "password") (keyValues entry)))
           putStrLn "Password has been copied into your clipboard"
     processArgs ["show", entry] = do
-      doEntry entry entryFn
-      where
-        entryFn entry = do
-          mapM_ (putStrLn . show) (keyValues entry)
+      doEntry entry (\entry -> mapM_ (putStrLn . show) (keyValues entry))          
     processArgs ["search", substr] = error "todo"
     processArgs ["import1password", fileName] = error "todo"
     processArgs ["update", entry, key, value] = error "todo"
