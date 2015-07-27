@@ -26,15 +26,11 @@ type Filename = T.Text
 
 data Index = Index {entries :: [IndexEntry]} deriving(Show,Eq,Generic)
 data IndexEntry = IndexEntry { label :: T.Text, file :: String} deriving(Show,Eq,Generic)
-data Entry = Entry { keyValues :: [KeyValue] } deriving(Eq,Generic)
+data Entry = Entry { keyValues :: [KeyValue] } deriving(Eq,Show,Generic)
 data KeyValue = KeyValue {key :: T.Text, value :: T.Text} deriving(Eq,Generic)
 
 instance Show KeyValue where
   show kv = ((T.unpack . key) kv) ++ ": " ++ ((T.unpack . value) kv)
-
--- TODO FIX THIS
-instance Show Entry where
-  show e = show $ fmap show (keyValues e)
 
 instance FromJSON KeyValue
 instance ToJSON KeyValue
@@ -71,18 +67,16 @@ main = do
       passwd <- (genPass genPwdNoSpecials pwdLength)
       newEntry entry username passwd pass idx
     processArgs ["clip", entry] = do
-      pass <- promptPass
-      maybeEntry <- index pass >>= (\idx -> return $ L.find (\x -> (label x) == (T.pack entry)) (entries idx))
-      clipEntry maybeEntry pass
+      doEntry entry entryFn
       where
-        clipEntry Nothing pass = do
-          putStrLn $ "no entry matching '" ++ entry ++ "' found!"
-          exitFailure
-        clipEntry (Just fileEntry) pass = do
-          entry <- getEntry pass (file fileEntry)
+        entryFn entry = do
           _ <- clip $ fromMaybe "" (fmap (\kv -> (value kv)) (L.find (\kv -> (key kv) == "password") (keyValues entry)))
           putStrLn "Password has been copied into your clipboard"
-    processArgs ["show", entry] = error "todo"
+    processArgs ["show", entry] = do
+      doEntry entry entryFn
+      where
+        entryFn entry = do
+          mapM_ (putStrLn . show) (keyValues entry)
     processArgs ["search", substr] = error "todo"
     processArgs ["import1password", fileName] = error "todo"
     processArgs ["update", entry, key, value] = error "todo"
@@ -91,6 +85,19 @@ main = do
     processArgs __ = do
       putStrLn "your options did not match any valid options"
       exitFailure
+
+doEntry entry entryFn = do
+  pass <- promptPass
+  maybeEntry <- index pass >>= (\idx -> return $ L.find (\x -> (label x) == (T.pack entry)) (entries idx))
+  clipEntry maybeEntry pass
+  where
+    clipEntry Nothing _ = do
+      putStrLn $ "no entry matching '" ++ entry ++ "' found!"
+      exitFailure
+    clipEntry (Just fileEntry) pass = do
+      entry <- getEntry pass (file fileEntry)
+      entryFn entry
+  
 
 newEntry :: String -> String -> T.Text -> Passphrase -> Index -> IO ()
 newEntry entry username newPwd pass idx = do
