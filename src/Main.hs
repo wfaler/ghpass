@@ -19,6 +19,7 @@ import Data.Maybe
 import Data.UUID.V4
 import qualified Data.UUID as UUID
 import Data.Char
+import Text.CSV
 
 type Passphrase = T.Text
 type Contents = T.Text
@@ -82,7 +83,10 @@ main = do
       doEntry entry (\entry -> mapM_ (putStrLn . show) (keyValues entry)) pass
     processArgs ["search", substr] = search substr
     processArgs ["search"] = search ""
-    processArgs ["import1password", fileName] = error "todo"
+    processArgs ["import1pass", fileName] = do
+      pass <- promptPass
+      idx <- index pass
+      importCsv fileName idx pass
     processArgs ["update", entry, key, value] = error "todo"
     processArgs ["rm", entry] = error "todo"
     processArgs ["rm-key", entry, key] = error "todo"
@@ -90,7 +94,7 @@ main = do
       putStrLn "your options did not match any valid options"
       exitFailure
 
-
+search :: [Char] -> IO ()
 search substr = do
   pass <- promptPass
   matches <- index pass >>= (\idx -> return $ filter (\e -> L.isInfixOf (fmap toLower substr) (((fmap toLower) . T.unpack . label) e)) (entries idx))
@@ -105,6 +109,7 @@ search substr = do
     putStrLn "Your input does not match any entries"
     exitFailure
 
+clipOrShow :: Passphrase -> String -> IO ()
 clipOrShow pass entry = do
   putStrLn "clipboard (c) or show (s)?"
   arg <- getLine
@@ -120,10 +125,12 @@ showWithIndex i (x:xs) = do
   putStrLn $ (show i) ++ ". " ++ (show x)
   showWithIndex (i + 1) xs
 
+clipEntry :: Entry -> IO ()
 clipEntry entry = do
   _ <- clip $ fromMaybe "" (fmap (\kv -> (value kv)) (L.find (\kv -> (key kv) == "password") (keyValues entry)))
   putStrLn "Password has been copied into your clipboard"
 
+doEntry :: String -> (Entry -> IO b) -> Passphrase -> IO b
 doEntry entry entryFn pass = do
   maybeEntry <- index pass >>= (\idx -> return $ L.find (\x -> (label x) == (T.pack entry)) (entries idx))
   clipEntry maybeEntry pass
@@ -146,8 +153,8 @@ entryExists entry idx = any (\x -> (label x) == (T.pack entry)) (entries idx)
 
 newEntryWithEntries :: String -> [KeyValue] -> Passphrase -> Index -> IO ()
 newEntryWithEntries entry kvs pass idx = do
-  entryExists <- return $ entryExists entry idx
-  if (entryExists)
+  exists <- return $ entryExists entry idx
+  if (exists)
     then
     do
       putStrLn $ "entry with name " ++ entry ++ "already exists!"
@@ -158,7 +165,7 @@ newEntryWithEntries entry kvs pass idx = do
       dtDir <- dataDir
       entr <- return $ Entry kvs
       _ <- saveFile False entr (dtDir ++ (UUID.toString filename) ++ ".gpg") pass
-      newIdx <- saveIndex (Index ((IndexEntry (T.pack entry) (UUID.toString filename)) : (entries idx))) pass
+      _ <- saveIndex (Index ((IndexEntry (T.pack entry) (UUID.toString filename)) : (entries idx))) pass
       putStrLn "New entry created"
   
 
@@ -318,3 +325,23 @@ saveFile overwrite obj file pass = do
       exitFailure
     else
     encrypt (toTxt $ obj) (T.pack file) pass
+
+
+{-
+0: notes
+1: password
+2: title
+3: type
+4: url
+5: username
+-}
+
+importCsv file index pass = do
+  result <- parseCSVFromFile file
+  doResult result
+  where
+    doResult (Left _) = do
+      putStrLn "Failed to parse"
+      exitFailure
+    doResult (Right csv) = do
+      mapM_ (\r -> (putStrLn . show) (r !! 6)) csv
