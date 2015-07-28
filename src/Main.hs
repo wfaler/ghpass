@@ -141,9 +141,12 @@ newEntry entry username newPwd pass idx = do
   newEntryWithEntries entry [(KeyValue "username" (T.pack username)), (KeyValue "password" newPwd)] pass idx
 
 
+entryExists :: String -> Index -> Bool
+entryExists entry idx = any (\x -> (label x) == (T.pack entry)) (entries idx)
+
 newEntryWithEntries :: String -> [KeyValue] -> Passphrase -> Index -> IO ()
 newEntryWithEntries entry kvs pass idx = do
-  entryExists <- return $ any (\x -> (label x) == (T.pack entry)) (entries idx)
+  entryExists <- return $ entryExists entry idx
   if (entryExists)
     then
     do
