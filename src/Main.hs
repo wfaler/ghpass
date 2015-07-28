@@ -138,6 +138,11 @@ doEntry entry entryFn pass = do
 
 newEntry :: String -> String -> T.Text -> Passphrase -> Index -> IO ()
 newEntry entry username newPwd pass idx = do
+  newEntryWithEntries entry [(KeyValue "username" (T.pack username)), (KeyValue "password" newPwd)] pass idx
+
+
+newEntryWithEntries :: String -> [KeyValue] -> Passphrase -> Index -> IO ()
+newEntryWithEntries entry kvs pass idx = do
   entryExists <- return $ any (\x -> (label x) == (T.pack entry)) (entries idx)
   if (entryExists)
     then
@@ -148,10 +153,11 @@ newEntry entry username newPwd pass idx = do
     do
       filename <- nextRandom
       dtDir <- dataDir
-      entr <- return $ Entry [(KeyValue "username" (T.pack username)), (KeyValue "password" newPwd)]
+      entr <- return $ Entry kvs
       _ <- saveFile False entr (dtDir ++ (UUID.toString filename) ++ ".gpg") pass
       newIdx <- saveIndex (Index ((IndexEntry (T.pack entry) (UUID.toString filename)) : (entries idx))) pass
       putStrLn "New entry created"
+  
 
 genPass :: Read a => (a -> [t] -> IO T.Text) -> String -> IO T.Text
 genPass genFn pwdLength = do
@@ -309,4 +315,3 @@ saveFile overwrite obj file pass = do
       exitFailure
     else
     encrypt (toTxt $ obj) (T.pack file) pass
-
