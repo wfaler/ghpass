@@ -18,6 +18,7 @@ import qualified Data.List as L
 import Data.Maybe
 import Data.UUID.V4
 import qualified Data.UUID as UUID
+import Data.Char
 
 type Passphrase = T.Text
 type Contents = T.Text
@@ -25,9 +26,12 @@ type Filename = T.Text
 
 
 data Index = Index {entries :: [IndexEntry]} deriving(Show,Eq,Generic)
-data IndexEntry = IndexEntry { label :: T.Text, file :: String} deriving(Show,Eq,Generic)
+data IndexEntry = IndexEntry { label :: T.Text, file :: String} deriving(Eq,Generic)
 data Entry = Entry { keyValues :: [KeyValue] } deriving(Eq,Show,Generic)
 data KeyValue = KeyValue {key :: T.Text, value :: T.Text} deriving(Eq,Generic)
+
+instance Show IndexEntry where
+  show e = T.unpack $ ((label) e)
 
 instance Show KeyValue where
   show kv = ((T.unpack . key) kv) ++ ": " ++ ((T.unpack . value) kv)
@@ -66,15 +70,18 @@ main = do
       idx <- index pass
       passwd <- (genPass genPwdNoSpecials pwdLength)
       newEntry entry username passwd pass idx
+    processArgs ["new", "--own-pass", entry, username, password] = do
+      pass <- promptPass
+      idx <- index pass
+      newEntry entry username (T.pack password) pass idx
     processArgs ["clip", entry] = do
-      doEntry entry entryFn
-      where
-        entryFn entry = do
-          _ <- clip $ fromMaybe "" (fmap (\kv -> (value kv)) (L.find (\kv -> (key kv) == "password") (keyValues entry)))
-          putStrLn "Password has been copied into your clipboard"
+      pass <- promptPass
+      doEntry entry clipEntry pass
     processArgs ["show", entry] = do
-      doEntry entry (\entry -> mapM_ (putStrLn . show) (keyValues entry))          
-    processArgs ["search", substr] = error "todo"
+      pass <- promptPass
+      doEntry entry (\entry -> mapM_ (putStrLn . show) (keyValues entry)) pass
+    processArgs ["search", substr] = search substr
+    processArgs ["search"] = search ""
     processArgs ["import1password", fileName] = error "todo"
     processArgs ["update", entry, key, value] = error "todo"
     processArgs ["rm", entry] = error "todo"
@@ -83,8 +90,41 @@ main = do
       putStrLn "your options did not match any valid options"
       exitFailure
 
-doEntry entry entryFn = do
+
+search substr = do
   pass <- promptPass
+  matches <- index pass >>= (\idx -> return $ filter (\e -> L.isInfixOf (fmap toLower substr) (((fmap toLower) . T.unpack . label) e)) (entries idx))
+  putStrLn "Matching entries: "
+  showWithIndex 1 matches
+  putStrLn "Select index you want to show"
+  entryNo <- getLine >>= (return . read) :: IO Int
+  if (entryNo <= (length matches))
+    then do
+    (return ((T.unpack . label) (matches !! (entryNo - 1)))) >>= (clipOrShow pass)
+    else do
+    putStrLn "Your input does not match any entries"
+    exitFailure
+
+clipOrShow pass entry = do
+  putStrLn "clipboard (c) or show (s)?"
+  arg <- getLine
+  doArg arg
+  where
+    doArg "s" = doEntry entry (\entry -> mapM_ (putStrLn . show) (keyValues entry)) pass
+    doArg "c" = doEntry entry clipEntry pass
+    doArg _ = clipOrShow pass entry
+    
+showWithIndex :: Int -> [IndexEntry] -> IO ()
+showWithIndex _ [] = return ()
+showWithIndex i (x:xs) = do
+  putStrLn $ (show i) ++ ". " ++ (show x)
+  showWithIndex (i + 1) xs
+
+clipEntry entry = do
+  _ <- clip $ fromMaybe "" (fmap (\kv -> (value kv)) (L.find (\kv -> (key kv) == "password") (keyValues entry)))
+  putStrLn "Password has been copied into your clipboard"
+
+doEntry entry entryFn pass = do
   maybeEntry <- index pass >>= (\idx -> return $ L.find (\x -> (label x) == (T.pack entry)) (entries idx))
   clipEntry maybeEntry pass
   where
