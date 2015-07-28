@@ -6,7 +6,7 @@ let
 
   f = { mkDerivation, aeson, base, bytestring, either
       , monad-control, mtl, random, stdenv, text, time, transformers
-      , uuid, free, shelly, process, directory
+      , uuid, free, shelly, process, directory, csv
       }:
       mkDerivation {
         pname = "ghpass";
@@ -17,7 +17,7 @@ let
         buildTools = [ haskellPackages.cabal-install haskellPackages.happy haskellPackages.alex haskellPackages.hlint];
         buildDepends = [
           aeson base bytestring either monad-control mtl random text time
-          transformers uuid shelly free process directory
+          transformers uuid shelly free process directory csv
         ];
         homepage = "https://github.com/wfaler/ghpass";
         license = stdenv.lib.licenses.unfree;
