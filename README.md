@@ -1,2 +1,2 @@
 # ghpass
-A Haskell/GPG password manager
+A Haskell/GPG password manager.
